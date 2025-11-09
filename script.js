@@ -6,8 +6,23 @@ let appState = {
     checkedProperties: new Set(),
     customPriorities: {},
     collapsedGroups: new Set(),
-    disabledProperties: new Set()
+    disabledProperties: new Set(),
+    currentRole: 'dps' // Default role: dps, tank, or spellcaster
 };
+
+// Helper function to get priority for current role
+function getPriorityForRole(propertyData) {
+    // If priority is a number (old format), return it
+    if (typeof propertyData.priority === 'number') {
+        return propertyData.priority;
+    }
+    // If priority is an object (new format), return priority for current role
+    if (typeof propertyData.priority === 'object') {
+        return propertyData.priority[appState.currentRole] ?? 1;
+    }
+    // Fallback
+    return 1;
+}
 
 // DOM elements
 let propertyGroupsContainer;
@@ -40,6 +55,10 @@ function initializeApp() {
     exportBtn = document.getElementById('export-btn');
     enableAllBtn = document.getElementById('enable-all-btn');
     disableAllBtn = document.getElementById('disable-all-btn');
+    
+    const setDpsBtn = document.getElementById('set-dps-btn');
+    const setTankBtn = document.getElementById('set-tank-btn');
+    const setSpellcasterBtn = document.getElementById('set-spellcaster-btn');
 
     // Load saved state from localStorage
     loadStateFromStorage();
@@ -52,6 +71,11 @@ function initializeApp() {
 
     // Setup event listeners
     setupEventListeners();
+    
+    // Setup preset button listeners
+    setDpsBtn.addEventListener('click', () => setRolePreset('dps'));
+    setTankBtn.addEventListener('click', () => setRolePreset('tank'));
+    setSpellcasterBtn.addEventListener('click', () => setRolePreset('spellcaster'));
 }
 
 function setupEventListeners() {
@@ -59,6 +83,38 @@ function setupEventListeners() {
     exportBtn.addEventListener('click', exportProgress);
     enableAllBtn.addEventListener('click', () => toggleAllProperties(true));
     disableAllBtn.addEventListener('click', () => toggleAllProperties(false));
+}
+
+function setRolePreset(role) {
+    if (confirm(`Set all properties to ${role.toUpperCase()} defaults? This will override your current custom priorities.`)) {
+        // Set the current role
+        appState.currentRole = role;
+        
+        // Clear custom priorities and apply role defaults
+        appState.customPriorities = {};
+        appState.disabledProperties.clear();
+        
+        // Apply role-based priorities
+        Object.entries(gearProperties).forEach(([groupName, groupData]) => {
+            Object.entries(groupData.properties).forEach(([propertyName, propertyData]) => {
+                const propertyId = `${groupName}:${propertyName}`;
+                const rolePriority = getPriorityForRole(propertyData);
+                
+                // Set custom priority to the role's default
+                appState.customPriorities[propertyId] = rolePriority;
+                
+                // If priority is 0, add to disabled properties
+                if (rolePriority === 0) {
+                    appState.disabledProperties.add(propertyId);
+                }
+            });
+        });
+        
+        // Re-render and save
+        renderPropertyGroups();
+        updateProgress();
+        saveStateToStorage();
+    }
 }
 
 function renderPropertyGroups() {
@@ -120,43 +176,10 @@ function createPropertyGroup(groupName, groupData) {
     const propertiesContainer = document.createElement('div');
     propertiesContainer.className = 'properties-container';
     
-    // Sort properties by priority (1, 2, 3) then alphabetically
-    const sortedProperties = Object.entries(groupData.properties).sort((a, b) => {
-        const [nameA, dataA] = a;
-        const [nameB, dataB] = b;
-        const propertyIdA = `${groupName}:${nameA}`;
-        const propertyIdB = `${groupName}:${nameB}`;
-        
-        // Get current priority (custom or default)
-        const priorityA = appState.customPriorities[propertyIdA] || dataA.priority;
-        const priorityB = appState.customPriorities[propertyIdB] || dataB.priority;
-        
-        // First sort by priority
-        if (priorityA !== priorityB) {
-            return priorityA - priorityB;
-        }
-        
-        // Then sort alphabetically
-        return nameA.localeCompare(nameB);
-    });
-    
-    // Group properties by priority for rendering
-    const propertyGroups = { 1: [], 2: [], 3: [] };
-    sortedProperties.forEach(([propertyName, propertyData]) => {
-        const propertyId = `${groupName}:${propertyName}`;
-        const currentPriority = appState.customPriorities[propertyId] || propertyData.priority;
-        propertyGroups[currentPriority].push([propertyName, propertyData]);
-    });
-    
-    // Render each priority group with separator
-    [1, 2, 3].forEach(priority => {
-        if (propertyGroups[priority].length > 0) {
-            // Add properties for this priority
-            propertyGroups[priority].forEach(([propertyName, propertyData]) => {
-                const propertyElement = createPropertyElement(propertyName, propertyData, groupName);
-                propertiesContainer.appendChild(propertyElement);
-            });
-        }
+    // Render properties in the order they're defined in the file
+    Object.entries(groupData.properties).forEach(([propertyName, propertyData]) => {
+        const propertyElement = createPropertyElement(propertyName, propertyData, groupName);
+        propertiesContainer.appendChild(propertyElement);
     });
     
     group.appendChild(propertiesContainer);
@@ -165,78 +188,36 @@ function createPropertyGroup(groupName, groupData) {
 
 function createPropertyElement(propertyName, propertyData, groupName) {
     const propertyId = `${groupName}:${propertyName}`;
-    const currentPriority = appState.customPriorities[propertyId] || propertyData.priority;
+    const defaultPriority = getPriorityForRole(propertyData);
+    const currentPriority = appState.customPriorities[propertyId] ?? defaultPriority;
     const isChecked = appState.checkedProperties.has(propertyId);
-    const isDisabled = appState.disabledProperties.has(propertyId);
+    // A property is disabled if it's in disabledProperties OR has priority 0
+    const isDisabled = appState.disabledProperties.has(propertyId) || currentPriority === 0;
 
     const property = document.createElement('div');
     property.className = `property priority-${currentPriority}${isChecked ? ' checked' : ''}${isDisabled ? ' disabled' : ''}`;
     
     property.innerHTML = `
-        <div class="property-controls">
-            <button class="toggle-btn ${isDisabled ? 'disabled' : 'enabled'}" 
-                    data-property-id="${propertyId}" 
-                    title="${isDisabled ? 'Enable this property' : 'Disable this property'}">
-                ${isDisabled ? '👁️‍🗨️' : '👁️'}
-            </button>
-        </div>
         <label class="property-label">
             <input type="checkbox" ${isChecked ? 'checked' : ''} 
                    data-property-id="${propertyId}" ${isDisabled ? 'disabled' : ''}>
             <span class="property-name">${propertyName}</span>
         </label>
         <div class="priority-selector">
+            <button class="priority-btn ${currentPriority === 0 ? 'active' : ''}" 
+                    data-priority="0" data-property-id="${propertyId}" 
+                    title="Priority 0 - Disabled">0</button>
             <button class="priority-btn ${currentPriority === 1 ? 'active' : ''}" 
-                    data-priority="1" data-property-id="${propertyId}" ${isDisabled ? 'disabled' : ''} 
+                    data-priority="1" data-property-id="${propertyId}" 
                     title="Priority 1 - Critical">1</button>
             <button class="priority-btn ${currentPriority === 2 ? 'active' : ''}" 
-                    data-priority="2" data-property-id="${propertyId}" ${isDisabled ? 'disabled' : ''} 
+                    data-priority="2" data-property-id="${propertyId}" 
                     title="Priority 2 - Important">2</button>
             <button class="priority-btn ${currentPriority === 3 ? 'active' : ''}" 
-                    data-priority="3" data-property-id="${propertyId}" ${isDisabled ? 'disabled' : ''} 
+                    data-priority="3" data-property-id="${propertyId}" 
                     title="Priority 3 - Nice-to-have">3</button>
         </div>
     `;
-
-    // Add event listeners
-    const toggleBtn = property.querySelector('.toggle-btn');
-    toggleBtn.addEventListener('click', (e) => {
-        const propertyId = e.target.dataset.propertyId;
-        
-        if (appState.disabledProperties.has(propertyId)) {
-            // Enable the property
-            appState.disabledProperties.delete(propertyId);
-            property.classList.remove('disabled');
-            toggleBtn.classList.remove('disabled');
-            toggleBtn.classList.add('enabled');
-            toggleBtn.innerHTML = '👁️';
-            toggleBtn.title = 'Disable this property';
-            
-            // Re-enable controls
-            const checkbox = property.querySelector('input[type="checkbox"]');
-            const priorityButtons = property.querySelectorAll('.priority-btn');
-            checkbox.disabled = false;
-            priorityButtons.forEach(btn => btn.disabled = false);
-            
-        } else {
-            // Disable the property
-            appState.disabledProperties.add(propertyId);
-            property.classList.add('disabled');
-            toggleBtn.classList.remove('enabled');
-            toggleBtn.classList.add('disabled');
-            toggleBtn.innerHTML = '👁️‍🗨️';
-            toggleBtn.title = 'Enable this property';
-            
-            // Disable controls
-            const checkbox = property.querySelector('input[type="checkbox"]');
-            const priorityButtons = property.querySelectorAll('.priority-btn');
-            checkbox.disabled = true;
-            priorityButtons.forEach(btn => btn.disabled = true);
-        }
-        
-        updateProgress();
-        saveStateToStorage();
-    });
 
     const checkbox = property.querySelector('input[type="checkbox"]');
     checkbox.addEventListener('change', (e) => {
@@ -257,18 +238,16 @@ function createPropertyElement(propertyName, propertyData, groupName) {
             const newPriority = parseInt(e.target.dataset.priority);
             const propertyId = e.target.dataset.propertyId;
             
-            // Update custom priorities
-            appState.customPriorities[propertyId] = newPriority;
+            // Handle priority 0 (disabled state)
+            if (newPriority === 0) {
+                appState.disabledProperties.add(propertyId);
+                appState.customPriorities[propertyId] = 0;
+            } else {
+                appState.disabledProperties.delete(propertyId);
+                appState.customPriorities[propertyId] = newPriority;
+            }
             
-            // Update button states
-            priorityButtons.forEach(b => b.classList.remove('active'));
-            e.target.classList.add('active');
-            
-            // Update property class (preserve disabled state)
-            const isDisabled = appState.disabledProperties.has(propertyId);
-            property.className = `property priority-${newPriority}${isChecked ? ' checked' : ''}${isDisabled ? ' disabled' : ''}`;
-            
-            // Re-render to update sorting
+            // Re-render to update the UI
             renderPropertyGroups();
             updateProgress();
             saveStateToStorage();
@@ -293,12 +272,20 @@ function toggleGroupProperties(groupName, enable) {
     const groupData = gearProperties[groupName];
     if (!groupData) return;
     
-    Object.keys(groupData.properties).forEach(propertyName => {
+    Object.entries(groupData.properties).forEach(([propertyName, propertyData]) => {
         const propertyId = `${groupName}:${propertyName}`;
         
         if (enable) {
+            // Restore to default priority or keep custom priority if not 0
+            const currentPriority = appState.customPriorities[propertyId];
+            if (currentPriority === 0) {
+                const defaultPriority = getPriorityForRole(propertyData);
+                appState.customPriorities[propertyId] = defaultPriority;
+            }
             appState.disabledProperties.delete(propertyId);
         } else {
+            // Set to priority 0 (disabled)
+            appState.customPriorities[propertyId] = 0;
             appState.disabledProperties.add(propertyId);
         }
     });
@@ -310,12 +297,20 @@ function toggleGroupProperties(groupName, enable) {
 
 function toggleAllProperties(enable) {
     Object.entries(gearProperties).forEach(([groupName, groupData]) => {
-        Object.keys(groupData.properties).forEach(propertyName => {
+        Object.entries(groupData.properties).forEach(([propertyName, propertyData]) => {
             const propertyId = `${groupName}:${propertyName}`;
             
             if (enable) {
+                // Restore to default priority or keep custom priority if not 0
+                const currentPriority = appState.customPriorities[propertyId];
+                if (currentPriority === 0) {
+                    const defaultPriority = getPriorityForRole(propertyData);
+                    appState.customPriorities[propertyId] = defaultPriority;
+                }
                 appState.disabledProperties.delete(propertyId);
             } else {
+                // Set to priority 0 (disabled)
+                appState.customPriorities[propertyId] = 0;
                 appState.disabledProperties.add(propertyId);
             }
         });
@@ -356,13 +351,14 @@ function calculateProgress() {
         Object.entries(groupData.properties).forEach(([propertyName, propertyData]) => {
             const propertyId = `${groupName}:${propertyName}`;
             const isDisabled = appState.disabledProperties.has(propertyId);
+            const defaultPriority = getPriorityForRole(propertyData);
+            const currentPriority = appState.customPriorities[propertyId] ?? defaultPriority;
             
-            // Skip disabled properties in progress calculation
-            if (isDisabled) {
+            // Skip disabled properties and priority 0 in progress calculation
+            if (isDisabled || currentPriority === 0) {
                 return;
             }
             
-            const currentPriority = appState.customPriorities[propertyId] || propertyData.priority;
             const isChecked = appState.checkedProperties.has(propertyId);
 
             stats[`priority${currentPriority}`].total++;
@@ -394,6 +390,7 @@ function exportProgress() {
     
     const exportData = {
         timestamp: new Date().toISOString(),
+        currentRole: appState.currentRole,
         statistics: stats,
         checkedProperties: checkedProperties,
         customPriorities: appState.customPriorities,
@@ -416,7 +413,8 @@ function saveStateToStorage() {
         checkedProperties: Array.from(appState.checkedProperties),
         customPriorities: appState.customPriorities,
         collapsedGroups: Array.from(appState.collapsedGroups),
-        disabledProperties: Array.from(appState.disabledProperties)
+        disabledProperties: Array.from(appState.disabledProperties),
+        currentRole: appState.currentRole
     };
     localStorage.setItem('ddo-gear-checklist-state', JSON.stringify(state));
 }
@@ -430,6 +428,7 @@ function loadStateFromStorage() {
             appState.customPriorities = state.customPriorities || {};
             appState.collapsedGroups = new Set(state.collapsedGroups || []);
             appState.disabledProperties = new Set(state.disabledProperties || []);
+            appState.currentRole = state.currentRole || 'dps';
         } catch (e) {
             console.warn('Failed to load saved state:', e);
         }

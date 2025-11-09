@@ -79,6 +79,17 @@ main {
     transform: translateY(-1px);
 }
 
+.btn-preset {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+}
+
+.btn-preset:hover {
+    background: linear-gradient(135deg, #5a6fd8 0%, #6a3f92 100%);
+    transform: translateY(-1px);
+    box-shadow: 0 4px 8px rgba(102, 126, 234, 0.3);
+}
+
 /* Stats Summary */
 .stats-summary {
     margin-bottom: 2rem;
@@ -299,6 +310,11 @@ main {
 }
 
 /* Priority-specific property container accents */
+.property.priority-0 {
+    border-left: 4px solid #6c757d;
+    background-color: rgba(108, 117, 125, 0.03);
+}
+
 .property.priority-1 {
     border-left: 4px solid #dc3545;
     background-color: rgba(220, 53, 69, 0.03);
@@ -312,6 +328,11 @@ main {
 .property.priority-3 {
     border-left: 4px solid #28a745;
     background-color: rgba(40, 167, 69, 0.03);
+}
+
+.property.checked.priority-0 {
+    background-color: rgba(108, 117, 125, 0.08);
+    border-left-width: 5px;
 }
 
 .property.checked.priority-1 {
@@ -427,45 +448,6 @@ footer {
     outline-offset: 2px;
 }
 
-/* Property Toggle and Disabled States */
-.property-controls {
-    display: flex;
-    align-items: center;
-    margin-right: 0.5rem;
-}
-
-.toggle-btn {
-    border: none;
-    background: transparent;
-    font-size: 1.2rem;
-    cursor: pointer;
-    padding: 0.25rem;
-    border-radius: 4px;
-    transition: all 0.2s ease;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    min-width: 32px;
-    min-height: 32px;
-}
-
-.toggle-btn:hover {
-    background-color: rgba(0, 0, 0, 0.1);
-}
-
-.toggle-btn.enabled {
-    color: #28a745;
-}
-
-.toggle-btn.disabled {
-    color: #6c757d;
-}
-
-.toggle-btn:focus {
-    outline: 2px solid #667eea;
-    outline-offset: 2px;
-}
-
 /* Disabled Property Styles */
 .property.disabled {
     opacity: 0.5;
@@ -513,13 +495,13 @@ footer {
 
 .property.disabled .priority-btn {
     opacity: 0.4;
-    cursor: not-allowed;
     filter: grayscale(0.5);
+    cursor: pointer;
 }
 
 .property.disabled .priority-btn:hover {
-    transform: none;
-    box-shadow: none;
+    transform: translateY(-1px);
+    opacity: 0.6;
 }
 
 /* Update property layout to include controls */
@@ -651,6 +633,28 @@ footer {
     border-color: #28a745;
     color: white;
     box-shadow: 0 0 0 3px rgba(40, 167, 69, 0.4);
+    transform: scale(1.1);
+}
+
+/* Priority 0 (Disabled) - Gray */
+.priority-btn[data-priority="0"] {
+    border: 2px solid #6c757d;
+    background: #fff;
+    color: #6c757d;
+    font-weight: 700;
+}
+
+.priority-btn[data-priority="0"]:hover {
+    background: #6c757d;
+    color: white;
+    box-shadow: 0 2px 6px rgba(108, 117, 125, 0.4);
+}
+
+.priority-btn[data-priority="0"].active {
+    background: linear-gradient(135deg, #6c757d, #5a6268);
+    border-color: #6c757d;
+    color: white;
+    box-shadow: 0 0 0 3px rgba(108, 117, 125, 0.4);
     transform: scale(1.1);
 }
 
