@@ -61,7 +61,18 @@ function initializeApp() {
     const setSpellcasterBtn = document.getElementById('set-spellcaster-btn');
 
     // Load saved state from localStorage
-    loadStateFromStorage();
+    const saved = localStorage.getItem('ddo-gear-checklist-state');
+    if (saved) {
+        loadStateFromStorage();
+    } else {
+        // No saved state: set all properties to priority 2 by default
+        Object.entries(gearProperties).forEach(([groupName, groupData]) => {
+            Object.entries(groupData.properties).forEach(([propertyName, propertyData]) => {
+                const propertyId = `${groupName}:${propertyName}`;
+                appState.customPriorities[propertyId] = 2;
+            });
+        });
+    }
 
     // Render the property groups
     renderPropertyGroups();
@@ -71,7 +82,7 @@ function initializeApp() {
 
     // Setup event listeners
     setupEventListeners();
-    
+
     // Setup preset button listeners
     setDpsBtn.addEventListener('click', () => setRolePreset('dps'));
     setTankBtn.addEventListener('click', () => setRolePreset('tank'));
@@ -372,12 +383,20 @@ function calculateProgress() {
 }
 
 function resetAllProperties() {
-    if (confirm('Are you sure you want to reset all properties? This will clear all checkmarks, custom priorities, and disabled states.')) {
+    if (confirm('Are you sure you want to reset all properties? This will clear all checkmarks, custom priorities, and disabled states, and set all priorities to 2.')) {
         appState.checkedProperties.clear();
         appState.customPriorities = {};
         appState.collapsedGroups.clear();
         appState.disabledProperties.clear();
-        
+
+        // Set all properties to priority 2
+        Object.entries(gearProperties).forEach(([groupName, groupData]) => {
+            Object.entries(groupData.properties).forEach(([propertyName, propertyData]) => {
+                const propertyId = `${groupName}:${propertyName}`;
+                appState.customPriorities[propertyId] = 2;
+            });
+        });
+
         renderPropertyGroups();
         updateProgress();
         saveStateToStorage();
