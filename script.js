@@ -43,6 +43,40 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 
 function initializeApp() {
+    // Import Progress button and file input
+    const importBtn = document.getElementById('import-btn');
+    const importFileInput = document.getElementById('import-file');
+
+    importBtn.addEventListener('click', () => {
+        importFileInput.value = '';
+        importFileInput.click();
+    });
+
+    importFileInput.addEventListener('change', (event) => {
+        const file = event.target.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            try {
+                const imported = JSON.parse(e.target.result);
+                // Basic validation
+                if (!imported || typeof imported !== 'object') throw new Error('Invalid file format');
+                // Restore state
+                appState.checkedProperties = new Set(imported.checkedProperties || []);
+                appState.customPriorities = imported.customPriorities || {};
+                appState.collapsedGroups = new Set(imported.collapsedGroups || []);
+                appState.disabledProperties = new Set(imported.disabledProperties || []);
+                appState.currentRole = imported.currentRole || 'dps';
+                renderPropertyGroups();
+                updateProgress();
+                saveStateToStorage();
+                alert('Progress imported successfully!');
+            } catch (err) {
+                alert('Failed to import progress: ' + err.message);
+            }
+        };
+        reader.readAsText(file);
+    });
     // Get DOM elements
     propertyGroupsContainer = document.getElementById('property-groups');
     priority1ProgressBar = document.getElementById('priority-1-progress');
