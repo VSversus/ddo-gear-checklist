@@ -1,3 +1,21 @@
+/* Feedback Bar */
+.feedback-bar {
+    background: #fff3cd;
+    color: #856404;
+    border: 1px solid #ffeeba;
+    padding: 1rem;
+    text-align: center;
+    font-size: 1rem;
+    margin: 0;
+}
+.feedback-bar a {
+    color: #0056b3;
+    text-decoration: underline;
+    font-weight: 600;
+}
+.feedback-bar a:hover {
+    color: #003366;
+}
 /* Reset and base styles */
 * {
     margin: 0;
